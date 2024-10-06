@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QWidget, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSize
 
 
 class ImageScrollApp(QMainWindow):
@@ -43,6 +43,7 @@ class ImageScrollApp(QMainWindow):
 
         # Counter to keep track of dynamically created scroll areas
         self.scroll_area_counter = 0
+        self.add_horizontal_scroll_area()
 
     def add_horizontal_scroll_area(self):
         # Create a horizontal scroll area
@@ -53,36 +54,35 @@ class ImageScrollApp(QMainWindow):
         horizontal_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         horizontal_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
+        # Add the horizontal scroll area to the vertical scroll layout
+        self.scroll_layout.addWidget(horizontal_scroll_area)
+
         # Create a container widget and layout for the images inside the scroll area
         image_container = QWidget()
-        image_layout = QHBoxLayout(image_container)
-        image_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
-        image_layout.setSpacing(10)  # Remove spacing between images
-
-        # Add the same image 5 times to the horizontal scroll area
-        for _ in range(15):
-            image_label = QLabel(self)
-            image_label.setScaledContents(True)  # Allow scaling if needed
-
-            # Todo: This does not work properly. There is still some vertical margain on each image which causes it
-            #  to scroll vertically.
-            pixmap = QPixmap('../ui/resources/test_pic.jpeg').scaled(image_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                            Qt.TransformationMode.SmoothTransformation)  # Load and scale the image
-            image_label.setPixmap(pixmap)
-
-
-
-            # Set the image label in the layout
-            image_layout.addWidget(image_label)
+        container_layout = QHBoxLayout()
+        container_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+        container_layout.setSpacing(10)  # spacing between images
+        image_container.setLayout(container_layout)
 
         # Set the container to the scroll area
         horizontal_scroll_area.setWidget(image_container)
 
-        # Add the horizontal scroll area to the vertical scroll layout
-        self.scroll_layout.addWidget(horizontal_scroll_area)
+        # Add the same image x times to the horizontal scroll area
+        for _ in range(3):
+            image_label = QLabel(image_container)
+            image_label.setScaledContents(True)  # Allow scaling if needed
+
+            # Todo: This does not work properly. There is still some vertical margain on each image which causes it
+            #  to scroll vertically.
+            pixmap = QPixmap('../ui/resources/test_pic.jpeg') # Load the image
+            image_label.setPixmap(pixmap)
+
+            # Set the image label in the layout
+            container_layout.addWidget(image_label)
+
 
         # Use QTimer to ensure the layout has been applied before adjusting image size
-        QTimer.singleShot(0, lambda: self.adjust_image_sizes(horizontal_scroll_area))
+        QTimer.singleShot(100, lambda: self.adjust_image_sizes(horizontal_scroll_area))
 
         # Increment counter for future references
         self.scroll_area_counter += 1
@@ -92,9 +92,12 @@ class ImageScrollApp(QMainWindow):
         total_height = self.vertical_scroll_area.viewport().height()  # Use viewport for accurate height
 
         # Calculate 1/3 of the total height
-        minimal_image_height = total_height // 3  # Integer division for 1/3
+        minimal_image_height = total_height // 3 # Integer division for 1/3
+        print(f'minimal height: {minimal_image_height}')
 
-        horizontal_scroll_area.setMinimumHeight(minimal_image_height)
+        # set lower limit for scroll area height
+        horizontal_scroll_area.setFixedHeight(minimal_image_height)
+
         # Get the image container inside the horizontal scroll area
         image_container = horizontal_scroll_area.widget()
         layout = image_container.layout()
@@ -103,10 +106,17 @@ class ImageScrollApp(QMainWindow):
         for i in range(layout.count()):
             image_label = layout.itemAt(i).widget()
             if isinstance(image_label, QLabel):
-                image_label.setMinimumHeight(minimal_image_height)
+                image_label.setFixedHeight(minimal_image_height)
+                print(image_label.size())
+
+                image_label.setPixmap(
+                    image_label.pixmap().scaledToHeight(image_label.height(),
+                                                Qt.TransformationMode.SmoothTransformation)
+                )
 
     def resizeEvent(self, event):
         """Adjust image heights when the window is resized."""
+        print(f'count {self.scroll_layout.count()}')
         for i in range(self.scroll_layout.count()):
             scroll_area = self.scroll_layout.itemAt(i).widget()
             if isinstance(scroll_area, QScrollArea):
