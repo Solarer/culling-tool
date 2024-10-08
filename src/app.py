@@ -61,16 +61,15 @@ class ImageScrollApp(QMainWindow):
 
         # Counter to keep track of dynamically created scroll areas
         self.scroll_area_counter = 0
-        self.add_horizontal_scroll_area()
-
 
     def file_dialog(self):
-        image_paths, type_filter = QFileDialog.getOpenFileNames(
-            self,
-            "Open Image",
-            "/media/Images/2023/03_ErsterGeburtstag/",
-            "Image Files (*.png *.jpg *.bmp *.CR2 *.CR3 *.DNG);;Raw Images (*.DNG)"
-        )
+        #image_paths, type_filter = QFileDialog.getOpenFileNames(
+        #    self,
+        #    "Open Image",
+        #    "/media/Images/2023/03_ErsterGeburtstag/",
+        #    "Image Files (*.png *.jpg *.bmp *.CR2 *.CR3 *.DNG);;Raw Images (*.DNG)"
+        #)
+        image_paths = ['/media/Images/2023/03_ErsterGeburtstag/IMG_' + str(i) + '.CR3' for i in range(2660, 2671)]
         for image_path in image_paths:
 
             try:
@@ -115,10 +114,11 @@ class ImageScrollApp(QMainWindow):
 
             # Todo: This does not work properly. There is still some vertical margain on each image which causes it
             #  to scroll vertically.
-            #pixmap = QPixmap('../ui/resources/test_pic.jpeg') # Load the image
             qimg = QImage()
             qimg.loadFromData(img)
-            pixmap = QPixmap(qimg) # Load the image
+
+            # pre-downscale to 1080p so that subsequent scaling is faster
+            pixmap = QPixmap(qimg).scaledToHeight(1080, Qt.TransformationMode.FastTransformation) # Load the image
 
             image_label.setPixmap(pixmap)
 
