@@ -1,13 +1,26 @@
 import sys
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QScrollArea, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QWidget, QSizePolicy
-)
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QTimer, QSize
+import re
+from profile import Profile
 
+import imageio.v3 as iio
+import logging
+from line_profiler import profile
+
+import rawpy
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QScrollArea, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QWidget, QSizePolicy, QFileDialog
+)
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt, QTimer, QSize
+
+logger = logging.getLogger(__name__)
 
 class ImageScrollApp(QMainWindow):
+
+
+    image_list = []
+
     def __init__(self):
         super().__init__()
 
@@ -41,9 +54,37 @@ class ImageScrollApp(QMainWindow):
         self.add_scroll_button.clicked.connect(self.add_horizontal_scroll_area)
         self.layout.addWidget(self.add_scroll_button)
 
+        # Add a button to load files
+        self.load_files_button = QPushButton("Load Files", self)
+        self.load_files_button.clicked.connect(self.file_dialog)
+        self.layout.addWidget(self.load_files_button)
+
         # Counter to keep track of dynamically created scroll areas
         self.scroll_area_counter = 0
         self.add_horizontal_scroll_area()
+
+
+    def file_dialog(self):
+        image_paths, type_filter = QFileDialog.getOpenFileNames(
+            self,
+            "Open Image",
+            "/media/Images/2023/03_ErsterGeburtstag/",
+            "Image Files (*.png *.jpg *.bmp *.CR2 *.CR3 *.DNG);;Raw Images (*.DNG)"
+        )
+        for image_path in image_paths:
+
+            try:
+                with rawpy.imread(image_path) as raw:
+                    thumb = raw.extract_thumb()
+                    if thumb.format == rawpy._rawpy.ThumbFormat.JPEG:
+                        # thumb.data is already in JPEG format, save as-is
+                        self.image_list.append(thumb.data)
+                    elif thumb.format == rawpy._rawpy.ThumbFormat.BITMAP:
+                        # thumb.data is an RGB numpy array, convert with imageio
+                        self.image_list.append(iio.imread(thumb))
+            except rawpy._rawpy.LibRawError as e:
+                print(f'Error loading file: {image_path}')
+        pass
 
     def add_horizontal_scroll_area(self):
         # Create a horizontal scroll area
@@ -68,13 +109,17 @@ class ImageScrollApp(QMainWindow):
         horizontal_scroll_area.setWidget(image_container)
 
         # Add the same image x times to the horizontal scroll area
-        for _ in range(3):
+        for img in self.image_list:
             image_label = QLabel(image_container)
             image_label.setScaledContents(True)  # Allow scaling if needed
 
             # Todo: This does not work properly. There is still some vertical margain on each image which causes it
             #  to scroll vertically.
-            pixmap = QPixmap('../ui/resources/test_pic.jpeg') # Load the image
+            #pixmap = QPixmap('../ui/resources/test_pic.jpeg') # Load the image
+            qimg = QImage()
+            qimg.loadFromData(img)
+            pixmap = QPixmap(qimg) # Load the image
+
             image_label.setPixmap(pixmap)
 
             # Set the image label in the layout
@@ -87,6 +132,7 @@ class ImageScrollApp(QMainWindow):
         # Increment counter for future references
         self.scroll_area_counter += 1
 
+    @profile
     def adjust_image_sizes(self, horizontal_scroll_area):
         # Get the height of the vertical scroll area
         total_height = self.vertical_scroll_area.viewport().height()  # Use viewport for accurate height
