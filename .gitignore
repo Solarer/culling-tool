@@ -72,3 +72,8 @@ CMakeLists.txt.user*
 *.dll
 *.exe
 
+src/profile_output*
+.idea
+.qtcreator
+*.pyproject.user
+*.pyproject
