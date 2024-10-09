@@ -15,8 +15,8 @@ from PySide6.QtCore import Qt, QTimer, QSize
 
 logger = logging.getLogger(__name__)
 
-class ImageScrollApp(QMainWindow):
 
+class ImageScrollApp(QMainWindow):
 
     image_list = []
 
@@ -36,13 +36,11 @@ class ImageScrollApp(QMainWindow):
         # Create a scroll area that will contain horizontal scroll areas
         self.vertical_scroll_area = QScrollArea(self)
         self.vertical_scroll_area.setWidgetResizable(True)
-
-        # Always show the vertical scrollbar
         self.vertical_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
-        self.scroll_content = QWidget()  # Container for the vertical scroll area
+        # Container for the vertical scroll area
+        self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
-
         self.scroll_content.setLayout(self.scroll_layout)
         self.vertical_scroll_area.setWidget(self.scroll_content)
 
@@ -105,8 +103,7 @@ class ImageScrollApp(QMainWindow):
             qimg.loadFromData(img)
 
             # pre-downscale to 1080p so that subsequent scaling is faster
-            pixmap = QPixmap(qimg).scaledToHeight(1080, Qt.TransformationMode.FastTransformation) # Load the image
-
+            pixmap = QPixmap(qimg).scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
             image_label.setPixmap(pixmap)
 
             # Set the image label in the layout
@@ -114,40 +111,17 @@ class ImageScrollApp(QMainWindow):
 
 
         # Use QTimer to ensure the layout has been applied before adjusting image size
-        QTimer.singleShot(100, lambda: self.adjust_image_sizes(horizontal_scroll_area))
+        QTimer.singleShot(100, lambda: horizontal_scroll_area.adjust_thumbnail_size())
 
         # Increment counter for future references
         self.scroll_area_counter += 1
-
-    @profile
-    def adjust_image_sizes(self, horizontal_scroll_area):
-
-        # set height to 1/3 of the total height
-        culling_group_area_height = self.vertical_scroll_area.viewport().height() // 3 # Integer division for 1/3
-        horizontal_scroll_area.setFixedHeight(culling_group_area_height)
-
-        # Get the image container inside the horizontal scroll area
-        image_container = horizontal_scroll_area.widget()
-        layout = image_container.layout()
-        image_height = horizontal_scroll_area.viewport().height()
-
-        # Set the minimum height for each image in the horizontal scroll area
-        for i in range(layout.count()):
-            image_label = layout.itemAt(i).widget()
-            if isinstance(image_label, QLabel):
-                image_label.setFixedHeight(image_height)
-                image_label.setPixmap(
-                    image_label.pixmap().scaledToHeight(image_label.height(),
-                                                Qt.TransformationMode.SmoothTransformation)
-                )
 
     def resizeEvent(self, event):
         """Adjust image heights when the window is resized."""
         for i in range(self.scroll_layout.count()):
             scroll_area = self.scroll_layout.itemAt(i).widget()
             if isinstance(scroll_area, QScrollArea):
-                self.adjust_image_sizes(scroll_area)
-
+                scroll_area.adjust_thumbnail_size()
         super().resizeEvent(event)
 
 class Thumbnail(QLabel):
@@ -196,6 +170,30 @@ class CullingGroupArea(QScrollArea):
     def add_thumbnail(self, thumb):
         self.layout.addWidget(thumb)
         self.thumb_list.append(thumb)
+
+    @profile
+    def adjust_thumbnail_size(self):
+
+        # set height to 1/3 of the total height
+        culling_group_area_height = self.parent().parent().height() // 3  # Integer division for 1/3
+        self.setFixedHeight(culling_group_area_height)
+
+        # Get the image container inside the horizontal scroll area
+        image_container = self.widget()
+        layout = image_container.layout()
+        image_height = self.viewport().height()
+
+        # Set the minimum height for each image in the horizontal scroll area
+        for i in range(layout.count()):
+            image_label = layout.itemAt(i).widget()
+            if isinstance(image_label, QLabel):
+                image_label.setFixedHeight(image_height)
+                image_label.setPixmap(
+                    image_label.pixmap().scaledToHeight(
+                        image_label.height(),
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                )
 
     def select_label(self, index):
         if index < 0 or index >= len(self.thumb_list):
