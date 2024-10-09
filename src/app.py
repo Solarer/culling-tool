@@ -123,25 +123,21 @@ class ImageScrollApp(QMainWindow):
 
     @profile
     def adjust_image_sizes(self, horizontal_scroll_area):
-        # Get the height of the vertical scroll area
-        total_height = self.vertical_scroll_area.viewport().height()  # Use viewport for accurate height
 
-        # Calculate 1/3 of the total height
-        minimal_image_height = total_height // 3 # Integer division for 1/3
-        print(f'minimal height: {minimal_image_height}')
-
-        # set lower limit for scroll area height
-        horizontal_scroll_area.setFixedHeight(minimal_image_height)
+        # set height to 1/3 of the total height
+        culling_group_area_height = self.vertical_scroll_area.viewport().height() // 3 # Integer division for 1/3
+        horizontal_scroll_area.setFixedHeight(culling_group_area_height)
 
         # Get the image container inside the horizontal scroll area
         image_container = horizontal_scroll_area.widget()
         layout = image_container.layout()
+        image_height = horizontal_scroll_area.viewport().height()
 
         # Set the minimum height for each image in the horizontal scroll area
         for i in range(layout.count()):
             image_label = layout.itemAt(i).widget()
             if isinstance(image_label, QLabel):
-                image_label.setFixedHeight(minimal_image_height)
+                image_label.setFixedHeight(image_height)
                 print(image_label.size())
 
                 image_label.setPixmap(
