@@ -1,5 +1,4 @@
 import sys
-import re
 
 import imageio.v3 as iio
 import logging
@@ -7,7 +6,6 @@ import logging
 from line_profiler import profile
 
 import rawpy
-import PySide6
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QScrollArea, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QWidget, QSizePolicy, QFileDialog
@@ -89,7 +87,7 @@ class ImageScrollApp(QMainWindow):
                         # thumb.data is an RGB numpy array, convert with imageio
                         self.image_list.append(iio.imread(thumb))
             except rawpy._rawpy.LibRawError as e:
-                print(f'Error loading file: {image_path}')
+                logger.error(f'Error loading file: {image_path}', e)
 
     def add_horizontal_scroll_area(self):
         # Create a horizontal scroll area
@@ -138,8 +136,6 @@ class ImageScrollApp(QMainWindow):
             image_label = layout.itemAt(i).widget()
             if isinstance(image_label, QLabel):
                 image_label.setFixedHeight(image_height)
-                print(image_label.size())
-
                 image_label.setPixmap(
                     image_label.pixmap().scaledToHeight(image_label.height(),
                                                 Qt.TransformationMode.SmoothTransformation)
@@ -147,7 +143,6 @@ class ImageScrollApp(QMainWindow):
 
     def resizeEvent(self, event):
         """Adjust image heights when the window is resized."""
-        print(f'count {self.scroll_layout.count()}')
         for i in range(self.scroll_layout.count()):
             scroll_area = self.scroll_layout.itemAt(i).widget()
             if isinstance(scroll_area, QScrollArea):
