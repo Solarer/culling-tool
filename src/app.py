@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ImageScrollApp(QMainWindow):
 
-    image_list = []
+    pixmap_list = []
 
     def __init__(self):
         super().__init__()
@@ -54,18 +54,21 @@ class ImageScrollApp(QMainWindow):
 
         # Add a button to load files
         self.load_files_button = QPushButton("Load Files", self)
-        self.load_files_button.clicked.connect(self.file_dialog)
+        self.load_files_button.clicked.connect(self.launch_file_dialog)
         self.layout.addWidget(self.load_files_button)
 
         # Counter to keep track of dynamically created scroll areas
         self.scroll_area_counter = 0
 
         # auto populate
-        self.file_dialog()
+        self.launch_file_dialog()
         # Use QTimer to ensure the layout has been applied before adjusting image size
-        QTimer.singleShot(100, lambda: self.add_horizontal_scroll_area())
+        QTimer.singleShot(100, lambda: self.add_horizontal_scroll_area(self.pixmap_list))
 
-    def file_dialog(self):
+    def launch_file_dialog(self):
+        """
+        Loads images from disk and add them as pixmaps to memory
+        """
         #image_paths, type_filter = QFileDialog.getOpenFileNames(
         #    self,
         #    "Open Image",
@@ -80,30 +83,32 @@ class ImageScrollApp(QMainWindow):
                     thumb = raw.extract_thumb()
                     if thumb.format == rawpy._rawpy.ThumbFormat.JPEG:
                         # thumb.data is already in JPEG format, save as-is
-                        self.image_list.append(thumb.data)
+                        thumb = thumb.data
                     elif thumb.format == rawpy._rawpy.ThumbFormat.BITMAP:
                         # thumb.data is an RGB numpy array, convert with imageio
-                        self.image_list.append(iio.imread(thumb))
+                        thumb = iio.imread(thumb)
             except rawpy._rawpy.LibRawError as e:
                 logger.error(f'Error loading file: {image_path}', e)
 
-    def add_horizontal_scroll_area(self):
+            qimg = QImage()
+            qimg.loadFromData(thumb)
+
+            # pre-downscale to 1080p so that subsequent scaling is faster
+            self.pixmap_list.append(
+                QPixmap(qimg)
+                .scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
+            )
+
+    def add_horizontal_scroll_area(self, pixmap_list):
         # Create a horizontal scroll area
         horizontal_scroll_area = CullingGroupArea(self)
         self.scroll_layout.addWidget(horizontal_scroll_area)
 
         # Add the same image x times to the horizontal scroll area
-        for img in self.image_list:
+        for pixmap in pixmap_list:
             image_label = Thumbnail(horizontal_scroll_area)
             image_label.setScaledContents(True)  # Allow scaling if needed
 
-            # Todo: This does not work properly. There is still some vertical margain on each image which causes it
-            #  to scroll vertically.
-            qimg = QImage()
-            qimg.loadFromData(img)
-
-            # pre-downscale to 1080p so that subsequent scaling is faster
-            pixmap = QPixmap(qimg).scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
             image_label.setPixmap(pixmap)
 
             # Set the image label in the layout
@@ -125,31 +130,41 @@ class ImageScrollApp(QMainWindow):
         super().resizeEvent(event)
 
 class Thumbnail(QLabel):
-    def __init__(self, text):
-        super().__init__(text)
+
+    def __init__(self, parent):
+        self.parent_object = parent
+        super().__init__(parent)
         self.setStyleSheet("""
                 border: 5px white;      /* 5px thick border around the image */
                 border-style: outset;       /* Ensures the image size doesn't change */
         """)
         self.selected = False
 
-    def select(self):
-        self.setStyleSheet("""
-                border: 5px yellow;      /* 5px thick border around the image */
-                border-style: outset;       /* Ensures the image size doesn't change */
-        """)
-        self.selected = True
+    def mousePressEvent(self, event):
+        # Handle mouse click to select the label
+        self.parent_object.clear_selection()
+        self.set_selected(True)
+        #self.parent_object.select_thumbnail()
+        #super().mousePressEvent(event)
 
-    def deselect(self):
-        self.setStyleSheet("""
-                border: 5px white;      /* 5px thick border around the image */
-                border-style: outset;       /* Ensures the image size doesn't change */
-        """)
-        self.selected = False
+
+    def set_selected(self, selected):
+        self.selected = selected
+        if selected:
+            self.setStyleSheet("""
+                    border: 5px yellow;      /* 5px thick border around the image */
+                    border-style: outset;       /* Ensures the image size doesn't change */
+            """)
+        else:
+            self.setStyleSheet("""
+                    border: 5px white;      /* 5px thick border around the image */
+                    border-style: outset;       /* Ensures the image size doesn't change */
+            """)
 
 
 class CullingGroupArea(QScrollArea):
     def __init__(self, parent):
+        self.parent_object = parent
         super().__init__(parent)
         self.setWidgetResizable(True)
 
@@ -195,6 +210,16 @@ class CullingGroupArea(QScrollArea):
                     )
                 )
 
+    def split_culling_group(self):
+        self.parent_object.add_horizontal_scroll_area(self.topLevelWidget().pixmap[self.selected_index+1:])
+        pass
+
+    def clear_selection(self):
+        for thumb in self.thumb_list:
+            thumb.set_selected(False)
+
+
+
     def select_label(self, index):
         if index < 0 or index >= len(self.thumb_list):
             return
@@ -210,6 +235,8 @@ class CullingGroupArea(QScrollArea):
         elif event.key() == Qt.Key.Key_Left:
             self.selected_index = (self.selected_index - 1) % len(self.thumb_list)
             self.select_label(self.selected_index)
+        elif event.key() == Qt.Key.Key_S:
+            self.split_culling_group()
         super().keyPressEvent(event)
 
     def mousePressEvent(self, event):
