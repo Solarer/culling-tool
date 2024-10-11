@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ImageScrollApp(QMainWindow):
 
-    pixmap_list = []
+    thumbnail_lists = [None,]
 
     def __init__(self):
         super().__init__()
@@ -49,7 +49,11 @@ class ImageScrollApp(QMainWindow):
 
         # Add a button to spawn new horizontal scroll areas
         self.add_scroll_button = QPushButton("Add Horizontal Scroll Area", self)
-        self.add_scroll_button.clicked.connect(self.add_horizontal_scroll_area)
+
+        # Todo: https://stackoverflow.com/questions/940555/pyqt-sending-parameter-to-slot-when-connecting-to-a-signal
+        self.add_scroll_button.clicked.connect(
+            lambda thumbnails=thumbnail_lists: self.add_horizontal_scroll_area(thumbnails)
+        )
         self.layout.addWidget(self.add_scroll_button)
 
         # Add a button to load files
@@ -63,7 +67,7 @@ class ImageScrollApp(QMainWindow):
         # auto populate
         self.launch_file_dialog()
         # Use QTimer to ensure the layout has been applied before adjusting image size
-        QTimer.singleShot(100, lambda: self.add_horizontal_scroll_area(self.pixmap_list))
+        QTimer.singleShot(100, lambda: self.add_horizontal_scroll_area(self.thumbnail_lists[0]))
 
     def launch_file_dialog(self):
         """
@@ -76,6 +80,8 @@ class ImageScrollApp(QMainWindow):
         #    "Image Files (*.png *.jpg *.bmp *.CR2 *.CR3 *.DNG);;Raw Images (*.DNG)"
         #)
         image_paths = ['/media/Images/2023/03_ErsterGeburtstag/IMG_' + str(i) + '.CR3' for i in range(2660, 2671)]
+        images_to_add = []
+
         for image_path in image_paths:
 
             try:
@@ -93,27 +99,31 @@ class ImageScrollApp(QMainWindow):
             qimg = QImage()
             qimg.loadFromData(thumb)
 
-            # pre-downscale to 1080p so that subsequent scaling is faster
-            self.pixmap_list.append(
-                QPixmap(qimg)
-                .scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
-            )
+            images_to_add.append(qimg)
 
-    def add_horizontal_scroll_area(self, pixmap_list):
+            # pre-downscale to 1080p so that subsequent scaling is faster
+            #self.pixmap_list.append(
+            #    QPixmap(qimg)
+            #    .scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
+            #)
+        if len(images_to_add) > 0:
+            self.thumbnail_lists.insert(0, images_to_add)
+
+    def add_horizontal_scroll_area(self, thumbnails):
         # Create a horizontal scroll area
         horizontal_scroll_area = CullingGroupArea(self)
         self.scroll_layout.addWidget(horizontal_scroll_area)
 
         # Add the same image x times to the horizontal scroll area
-        for pixmap in pixmap_list:
+        for thumb in thumbnails:
             image_label = Thumbnail(horizontal_scroll_area)
             image_label.setScaledContents(True)  # Allow scaling if needed
-
-            image_label.setPixmap(pixmap)
+            image_label.setPixmap(
+                QPixmap(thumb).scaledToHeight(1080, Qt.TransformationMode.FastTransformation)
+            )
 
             # Set the image label in the layout
             horizontal_scroll_area.add_thumbnail(image_label)
-
 
         # Use QTimer to ensure the layout has been applied before adjusting image size
         QTimer.singleShot(100, lambda: horizontal_scroll_area.adjust_thumbnail_size())
